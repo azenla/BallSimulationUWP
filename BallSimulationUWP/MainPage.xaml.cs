@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Numerics;
 using System.Threading.Tasks;
 using Windows.UI;
 using Windows.UI.Xaml;
@@ -24,6 +25,17 @@ namespace BallSimulationUWP
             InitializeComponent();
 
             SetupClient();
+
+            PointerPressed += (sender, args) =>
+            {
+                var point = args.GetCurrentPoint(this);
+                AddBallAtPosition((float) point.Position.X, (float) point.Position.Y);
+            };
+        }
+
+        public void AddBallAtPosition(float x, float y)
+        {
+            _client.SendCommand($"A 0.1 20.0 {x} {y} 1.0 1.0");
         }
 
         public async Task SetupClient()
@@ -32,21 +44,21 @@ namespace BallSimulationUWP
 
             var tcpClient = new TcpClient();
             await tcpClient.ConnectAsync(IPAddress.Loopback, 9020);
-            _client = new WorldClient(tcpClient, OnTick);
-            _client.Handle();
-        }
-
-        public void OnTick()
-        {
-            foreach (var entity in _client.Entities)
-            {
-                UpdateWorldEntity(entity);
-            }
+            _client = new WorldClient(tcpClient, UpdateWorldEntity);
+            await _client.Handle();
         }
 
         public void UpdateWorldEntity(BallEntity entity)
         {
             Ellipse ellipse;
+
+            if (!_client.DoesEntityExist(entity.RemoteId))
+            {
+                if (!_entityShapes.ContainsKey(entity)) return;
+                ellipse = _entityShapes[entity];
+                MainCanvas.Children.Remove(ellipse);
+            }
+
             if (_entityShapes.ContainsKey(entity))
             {
                 ellipse = _entityShapes[entity];
@@ -59,6 +71,10 @@ namespace BallSimulationUWP
                 ellipse.Stroke = new SolidColorBrush(Colors.Black);
                 ellipse.StrokeThickness = 2.0;
                 ellipse.Width = ellipse.Height = entity.Radius * 2;
+                ellipse.DataContext = entity;
+
+                ellipse.AddHandler(PointerPressedEvent, new PointerEventHandler(HandleEntityPointerClick), true);
+
                 _entityShapes[entity] = ellipse;
             }
 
@@ -72,22 +88,28 @@ namespace BallSimulationUWP
             ellipse.Fill = new SolidColorBrush(GetEntityColor(entity));
         }
 
+        public void HandleEntityPointerClick(object sender, PointerRoutedEventArgs args)
+        {
+            var ellipse = (Ellipse) sender;
+            var entity = (BallEntity) ellipse.DataContext;
+            var point = args.GetCurrentPoint(this);
+
+            if (point.Properties.IsRightButtonPressed)
+            {
+                _client.SendCommand($"D {entity.RemoteId}");
+            }
+        }
+
         public Color GetEntityColor(BallEntity entity)
         {
-            var approximateSpeed = Math.Abs(entity.Velocity.X) + Math.Abs(entity.Velocity.Y);
+            var approximateSpeed = entity.Velocity.Length();
 
-            if (approximateSpeed <= 0)
+            if (approximateSpeed <= World.Epsilon)
             {
                 return Colors.Blue;
             }
-            else if (approximateSpeed <= 2)
-            {
-                return Colors.Green;
-            }
-            else
-            {
-                return Colors.Red;
-            }
+
+            return approximateSpeed <= 50.0 ? Colors.Green : Colors.Red;
         }
 
         private void ScatterButton_Click(object sender, RoutedEventArgs e)
@@ -113,6 +135,11 @@ namespace BallSimulationUWP
         private void ToggleCollisions_OnClick(object sender, RoutedEventArgs e)
         {
             _client.SendCommand("C");
+        }
+
+        private void ToggleElasticity_OnClick(object sender, RoutedEventArgs e)
+        {
+            _client.SendCommand("E");
         }
     }
 }

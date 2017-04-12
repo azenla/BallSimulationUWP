@@ -4,18 +4,15 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading.Tasks;
 using System.Net.Sockets;
 using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace BallSimulationUWP
 {
     public class WorldServer
     {
         private readonly Simulator _simulator;
-        private readonly int _port;
         private readonly TcpListener _listener;
         private readonly List<WorldServerClient> _clients = new List<WorldServerClient>();
 
@@ -24,7 +21,6 @@ namespace BallSimulationUWP
         public WorldServer(Simulator simulator, int port)
         {
             _simulator = simulator;
-            _port = port;
             _listener = new TcpListener(IPAddress.Any, port);
 
             _simulator.OnTickCallback = OnSimulatorTick;
@@ -101,11 +97,24 @@ namespace BallSimulationUWP
             }
             else if (cmd == "G")
             {
-                World.Gravity = Math.Abs(World.Gravity) < World.Epsilon ? 3.33333f : 0;
+                World.Gravity = Math.Abs(World.Gravity) > World.Epsilon ? 0.0f : World.DefaultGravity;
             }
             else if (cmd == "C")
             {
                 World.EnableCollisions = !World.EnableCollisions;
+            }
+            else if (cmd == "E")
+            {
+                World.Restitution = Math.Abs(World.Restitution) < World.Epsilon ? 0.85f : 0.0f;
+            }
+            else if (cmd == "D")
+            {
+                var id = int.Parse(parts[1]);
+                foreach (var entity in _simulator.Entities.Where((entity) => entity.GetHashCode() == id).ToList())
+                {
+                    _simulator.RemoveBall(entity);
+                    SendBallDelete(id);
+                }
             }
         }
 
@@ -134,7 +143,7 @@ namespace BallSimulationUWP
 
         public void SendInitialState(WorldServerClient client)
         {
-            foreach (var entity in _simulator.Entities())
+            foreach (var entity in _simulator.Entities)
             {
                 client.Send($"A {entity.GetHashCode()} {entity.Mass} {entity.Radius} {entity.Position.X} {entity.Position.Y} {entity.Velocity.X} {entity.Velocity.Y}");
             }
@@ -170,12 +179,30 @@ namespace BallSimulationUWP
 
         public async Task Handle()
         {
-            while (_client.Connected)
+            try
             {
-                var line = await _reader.ReadLineAsync();
-                _server.HandleCommand(this, line);
+                while (_client.Connected)
+                {
+                    var line = await _reader.ReadLineAsync();
+                    try
+                    {
+                        _server.HandleCommand(this, line);
+
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.WriteLine($"Server failed to handle message '{line}': {e}");
+                    }
+                }
             }
-            _server.RemoveClient(this);
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Server failed to handle client: {e}");
+            }
+            finally
+            {
+                _server.RemoveClient(this);
+            }
         }
 
         public void Send(string msg)
@@ -190,15 +217,14 @@ namespace BallSimulationUWP
 
     public class WorldClient
     {
-        public readonly Action UpdateHandler;
+        public readonly Action<BallEntity> UpdateHandler;
         private readonly TcpClient _client;
         private readonly StreamReader _reader;
         private readonly StreamWriter _writer;
 
-        public List<BallEntity> Entities = new List<BallEntity>();
-        private Dictionary<int, int> _remoteToIndexes = new Dictionary<int, int>();
+        private readonly Dictionary<int, BallEntity> _entities = new Dictionary<int, BallEntity>();
 
-        public WorldClient(TcpClient client, Action updateHandler)
+        public WorldClient(TcpClient client, Action<BallEntity> updateHandler)
         {
             UpdateHandler = updateHandler;
 
@@ -221,6 +247,11 @@ namespace BallSimulationUWP
             }
         }
 
+        public bool DoesEntityExist(int remoteId)
+        {
+            return _entities.ContainsKey(remoteId);
+        }
+
         public void HandleCommand(string msg)
         {
             var parts = msg.Split(' ');
@@ -236,16 +267,15 @@ namespace BallSimulationUWP
                 var velocityX = float.Parse(parts[6]);
                 var velocityY = float.Parse(parts[7]);
 
-                var ball = new BallEntity(mass, radius, new Vector2(x, y))
+                var entity = new BallEntity(mass, radius, new Vector2(x, y))
                 {
                     Velocity = new Vector2(velocityX, velocityY),
                     RemoteId = remoteId
                 };
 
-                Entities.Add(ball);
-                _remoteToIndexes[ball.RemoteId] = Entities.Count - 1;
+                _entities[remoteId] = entity;
 
-                UpdateHandler();
+                UpdateHandler(entity);
             }
             else if (cmd == "U")
             {
@@ -255,15 +285,25 @@ namespace BallSimulationUWP
                 var velocityX = float.Parse(parts[4]);
                 var velocityY = float.Parse(parts[5]);
 
-                if (!_remoteToIndexes.ContainsKey(remoteId))
+                if (!_entities.ContainsKey(remoteId))
                 {
+                    Debug.WriteLine($"Server tried to update entity with ID {remoteId}, but the client never knew this entity existed.");
                     return;
                 }
 
-                var entity = Entities[_remoteToIndexes[remoteId]];
+                var entity = _entities[remoteId];
                 entity.Position = new Vector2(x, y);
                 entity.Velocity = new Vector2(velocityX, velocityY);
-                UpdateHandler();
+                UpdateHandler(entity);
+            }
+            else if (cmd == "D")
+            {
+                var remoteId = int.Parse(parts[1]);
+
+                if (!_entities.ContainsKey(remoteId)) return;
+                var entity = _entities[remoteId];
+                _entities.Remove(remoteId);
+                UpdateHandler(entity);
             }
         }
 

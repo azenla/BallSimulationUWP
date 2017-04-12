@@ -28,9 +28,12 @@ namespace BallSimulationUWP
             _simulator = new Simulator(new World());
             _server = new WorldServer(_simulator, 9020);
 
-            for (var i = 1; i <= 50; i++)
+            var random = new Random();
+
+            for (var i = 1; i <= 10; i++)
             {
-                var ball = new BallEntity(0.1f, 20.0f, new Vector2(i * 20, i * 20));
+                var factor = (float) random.NextDouble() * 2;
+                var ball = new BallEntity(factor, 20.0f, new Vector2(i * 50, i * 50));
                 _simulator.AddBall(ball);
             }
 
@@ -69,7 +72,6 @@ namespace BallSimulationUWP
         private void OnSuspending(object sender, SuspendingEventArgs e)
         {
             var deferral = e.SuspendingOperation.GetDeferral();
-            //TODO: Save application state and stop any background activity
             deferral.Complete();
 
             _server?.Stop();

@@ -8,7 +8,9 @@
     MaxWidth="1024"
     MaxHeight="1024">
 
-    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+          BorderBrush="Black"
+          BorderThickness="2">
         <Canvas
             Name="MainCanvas"
             HorizontalAlignment="Stretch" 
@@ -20,6 +22,7 @@
             <Button Name="ToggleGravityButton" Click="ToggleGravityButton_Click" Content="Toggle Gravity" Canvas.Left="280" Canvas.Top="0"></Button>
             <Button Name="ZeroVelocityButton" Click="ZeroVelocityButton_OnClick" Content="Zero Velocity" Canvas.Left="410" Canvas.Top="0"></Button>
             <Button Name="ToggleCollisions" Click="ToggleCollisions_OnClick" Content="Toggle Collisions" Canvas.Left="530" Canvas.Top="0"></Button>
+            <Button Name="ToggleElasticity" Click="ToggleElasticity_OnClick" Content="Toggle Elasticity" Canvas.Left="670" Canvas.Top="0"></Button>
         </Canvas>
     </Grid>
 </Page>
