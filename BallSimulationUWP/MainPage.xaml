@@ -1,0 +1,25 @@
+﻿<Page
+    x:Class="BallSimulationUWP.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    MaxWidth="1024"
+    MaxHeight="1024">
+
+    <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Canvas
+            Name="MainCanvas"
+            HorizontalAlignment="Stretch" 
+            VerticalAlignment="Stretch"
+            Width="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=ActualWidth}"
+            Height="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=ActualHeight}">
+            <Button Name="ScatterButton" Click="ScatterButton_Click" Content="Scatter" Canvas.Left="90" Canvas.Top="0"></Button>
+            <Button Name="ToggleButton" Click="ToggleButton_Click" Content="Toggle Sim" Canvas.Left="170" Canvas.Top="0"></Button>
+            <Button Name="ToggleGravityButton" Click="ToggleGravityButton_Click" Content="Toggle Gravity" Canvas.Left="280" Canvas.Top="0"></Button>
+            <Button Name="ZeroVelocityButton" Click="ZeroVelocityButton_OnClick" Content="Zero Velocity" Canvas.Left="410" Canvas.Top="0"></Button>
+            <Button Name="ToggleCollisions" Click="ToggleCollisions_OnClick" Content="Toggle Collisions" Canvas.Left="530" Canvas.Top="0"></Button>
+        </Canvas>
+    </Grid>
+</Page>
