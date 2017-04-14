@@ -29,7 +29,7 @@ namespace BallSimulationUWP
 
             PointerPressed += (sender, args) =>
             {
-                var point = args.GetCurrentPoint(this);
+                var point = args.GetCurrentPoint(MainCanvas);
                 var position = ScaleClientToServerPosition(point.Position.ToVector2());
                 AddBallAtPosition(position.X, position.Y);
             };
@@ -122,7 +122,7 @@ namespace BallSimulationUWP
         {
             var ellipse = (Ellipse) sender;
             var entity = (BallEntity) ellipse.DataContext;
-            var point = args.GetCurrentPoint(this);
+            var point = args.GetCurrentPoint(MainCanvas);
 
             if (point.Properties.IsRightButtonPressed)
             {
