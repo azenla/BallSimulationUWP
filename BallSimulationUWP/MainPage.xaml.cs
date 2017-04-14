@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
@@ -13,7 +14,7 @@ using Windows.UI.Xaml.Shapes;
 
 namespace BallSimulationUWP
 {
-    public sealed partial class MainPage : Page
+    public sealed partial class MainPage
     {
         private WorldClient _client;
         private readonly Dictionary<BallEntity, Ellipse> _entityShapes;
@@ -24,31 +25,47 @@ namespace BallSimulationUWP
 
             InitializeComponent();
 
-            SetupClient();
+            SetupClient(IPAddress.Loopback);
 
             PointerPressed += (sender, args) =>
             {
                 var point = args.GetCurrentPoint(this);
-                AddBallAtPosition((float) point.Position.X, (float) point.Position.Y);
+                var position = ScaleClientToServerPosition(point.Position.ToVector2());
+                AddBallAtPosition(position.X, position.Y);
+            };
+
+            SizeChanged += (sender, args) =>
+            {
+                RefreshAllEntities();
             };
         }
 
         public void AddBallAtPosition(float x, float y)
         {
-            _client.SendCommand($"A 0.1 20.0 {x} {y} 1.0 1.0");
+            var mass = new Random().NextDouble();
+            _client.SendCommand($"A {mass} 20.0 {x} {y} 20.0 20.0");
         }
 
-        public async Task SetupClient()
+        public async Task SetupClient(IPAddress address)
         {
-            _client?.Close();
+            try
+            {
+                _client?.Close();
+                ClearEntities();
 
-            var tcpClient = new TcpClient();
-            await tcpClient.ConnectAsync(IPAddress.Loopback, 9020);
-            _client = new WorldClient(tcpClient, UpdateWorldEntity);
-            await _client.Handle();
+                var tcpClient = new TcpClient();
+                await tcpClient.ConnectAsync(address, 9020);
+                Debug.WriteLine("Client is now connected to the server.");
+                _client = new WorldClient(tcpClient, entity => UpdateWorldEntity(entity));
+                await _client.Handle();
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"Failed to connect to server: {e}");
+            }
         }
 
-        public void UpdateWorldEntity(BallEntity entity)
+        public void UpdateWorldEntity(BallEntity entity, bool forceUpdate = false)
         {
             Ellipse ellipse;
 
@@ -70,22 +87,35 @@ namespace BallSimulationUWP
                 ellipse.Fill = new SolidColorBrush(Colors.CornflowerBlue);
                 ellipse.Stroke = new SolidColorBrush(Colors.Black);
                 ellipse.StrokeThickness = 2.0;
-                ellipse.Width = ellipse.Height = entity.Radius * 2;
                 ellipse.DataContext = entity;
 
                 ellipse.AddHandler(PointerPressedEvent, new PointerEventHandler(HandleEntityPointerClick), true);
 
                 _entityShapes[entity] = ellipse;
+
+                forceUpdate = true;
             }
 
-            ellipse.Margin = new Thickness(
-                entity.Position.X,
-                entity.Position.Y,
-                ellipse.Margin.Right,
-                ellipse.Margin.Bottom
-            );
+            if (forceUpdate)
+            {
+                var size = ScaleServerToClientPosition(new Vector2(entity.Radius * 2, entity.Radius * 2));
+                ellipse.Width = size.X;
+                ellipse.Height = size.Y;
+            }
+
+            var position = ScaleServerToClientPosition(entity.Position);
+            Canvas.SetLeft(ellipse, position.X);
+            Canvas.SetTop(ellipse, position.Y);
 
             ellipse.Fill = new SolidColorBrush(GetEntityColor(entity));
+        }
+
+        public void RefreshAllEntities()
+        {
+            foreach (var entity in _entityShapes.Keys)
+            {
+                UpdateWorldEntity(entity, true);
+            }
         }
 
         public void HandleEntityPointerClick(object sender, PointerRoutedEventArgs args)
@@ -110,6 +140,22 @@ namespace BallSimulationUWP
             }
 
             return approximateSpeed <= 50.0 ? Colors.Green : Colors.Red;
+        }
+
+        public Vector2 ScaleServerToClientPosition(Vector2 position)
+        {
+            var scaleX = MainCanvas.ActualWidth / World.DefaultWidth; // TODO: Have server and client negotiate at connection start, to get world information
+            var scaleY = MainCanvas.ActualHeight / World.DefaultHeight;
+
+            return new Vector2((float) (position.X * scaleX), (float) (position.Y * scaleY));
+        }
+
+        public Vector2 ScaleClientToServerPosition(Vector2 position)
+        {
+            var scaleX = World.DefaultWidth / MainCanvas.ActualWidth; // TODO: Have server and client negotiate at connection start, to get world information
+            var scaleY = World.DefaultHeight / MainCanvas.ActualHeight;
+
+            return new Vector2((float) (position.X * scaleX), (float) (position.Y * scaleY));
         }
 
         private void ScatterButton_Click(object sender, RoutedEventArgs e)
@@ -140,6 +186,58 @@ namespace BallSimulationUWP
         private void ToggleElasticity_OnClick(object sender, RoutedEventArgs e)
         {
             _client.SendCommand("E");
+        }
+
+        private void ClearEntities()
+        {
+            foreach (var shape in _entityShapes.Values)
+            {
+                MainCanvas.Children.Remove(shape);
+            }
+
+            _entityShapes.Clear();
+        }
+
+        private void ClientConnect_OnClick(object sender, RoutedEventArgs e)
+        {
+            HandleClientConnect();
+        }
+
+        private async void HandleClientConnect()
+        {
+            var ip = await ShowAddressDialog();
+
+            if (ip.Length == 0) return;
+            var addresses = await Dns.GetHostAddressesAsync(ip);
+            if (addresses.Length == 0)
+            {
+                Debug.WriteLine($"Failed to resolve host {ip}... falling back to local server.");
+                addresses = new[] { IPAddress.Loopback };
+            }
+            var address = addresses[0];
+            Debug.WriteLine($"Connecting to {address}");
+            SetupClient(address);
+        }
+
+        private static async Task<string> ShowAddressDialog()
+        {
+            var box = new TextBox
+            {
+                AcceptsReturn = false,
+                Height = 32
+            };
+
+            var dialog = new ContentDialog
+            {
+                Content = box,
+                Title = "Simulation Server Address",
+                IsSecondaryButtonEnabled = true,
+                PrimaryButtonText = "Connect",
+                SecondaryButtonText = "Cancel"
+            };
+
+            var result = await dialog.ShowAsync();
+            return result == ContentDialogResult.Primary ? box.Text : "";
         }
     }
 }

@@ -16,7 +16,9 @@ namespace BallSimulationUWP
         private readonly TcpListener _listener;
         private readonly List<WorldServerClient> _clients = new List<WorldServerClient>();
 
-        private bool _running = false;
+        private readonly Queue<WorldServerClient> _newClients = new Queue<WorldServerClient>();
+
+        private bool _running;
 
         public WorldServer(Simulator simulator, int port)
         {
@@ -38,12 +40,19 @@ namespace BallSimulationUWP
                 Debug.WriteLine("Client Connected");
                 var client = new WorldServerClient(this, tcpClient);
                 _clients.Add(client);
+                _newClients.Enqueue(client);
                 client.Handle();
             }
         }
 
         public void OnSimulatorTick()
         {
+            while (_newClients.Count > 0)
+            {
+                var client = _newClients.Dequeue();
+                SendInitialState(client);
+            }
+
             foreach (var entity in _simulator.World.Entities)
             {
                 if (entity.GetUpdateFlag())
@@ -110,7 +119,7 @@ namespace BallSimulationUWP
             else if (cmd == "D")
             {
                 var id = int.Parse(parts[1]);
-                foreach (var entity in _simulator.Entities.Where((entity) => entity.GetHashCode() == id).ToList())
+                foreach (var entity in _simulator.Entities.Where(entity => entity.GetHashCode() == id).ToList())
                 {
                     _simulator.RemoveBall(entity);
                     SendBallDelete(id);
@@ -120,7 +129,8 @@ namespace BallSimulationUWP
 
         public void BroadcastMessage(string msg)
         {
-            foreach (var client in _clients)
+            var clients = new List<WorldServerClient>(_clients);
+            foreach (var client in clients)
             {
                 client.Send(msg);
             }
@@ -162,6 +172,8 @@ namespace BallSimulationUWP
         private readonly StreamReader _reader;
         private readonly StreamWriter _writer;
 
+        private bool _shouldHandle = true;
+
         public WorldServerClient(WorldServer server, TcpClient client)
         {
             _server = server;
@@ -173,21 +185,24 @@ namespace BallSimulationUWP
             {
                 AutoFlush = true
             };
-
-            _server.SendInitialState(this);
         }
 
         public async Task Handle()
         {
             try
             {
-                while (_client.Connected)
+                while (_client.Connected && _shouldHandle)
                 {
                     var line = await _reader.ReadLineAsync();
+
+                    if (line.Length == 0)
+                    {
+                        break;
+                    }
+
                     try
                     {
                         _server.HandleCommand(this, line);
-
                     }
                     catch (Exception e)
                     {
@@ -201,6 +216,7 @@ namespace BallSimulationUWP
             }
             finally
             {
+                _shouldHandle = false;
                 _server.RemoveClient(this);
             }
         }
@@ -211,7 +227,17 @@ namespace BallSimulationUWP
             {
                 msg += "\n";
             }
-            _writer.Write(msg.ToCharArray());
+
+            try
+            {
+                _writer.Write(msg.ToCharArray());
+            }
+            catch
+            {
+                Debug.WriteLine("Failed to send a message to a client. Considering it disconnected.");
+                _shouldHandle = false;
+                _server.RemoveClient(this);
+            }
         }
     }
 
@@ -221,8 +247,9 @@ namespace BallSimulationUWP
         private readonly TcpClient _client;
         private readonly StreamReader _reader;
         private readonly StreamWriter _writer;
-
         private readonly Dictionary<int, BallEntity> _entities = new Dictionary<int, BallEntity>();
+
+        private bool _shouldHandle;
 
         public WorldClient(TcpClient client, Action<BallEntity> updateHandler)
         {
@@ -240,7 +267,8 @@ namespace BallSimulationUWP
 
         public async Task Handle()
         {
-            while (_client.Connected)
+            _shouldHandle = true;
+            while (_client.Connected && _shouldHandle)
             {
                 var line = await _reader.ReadLineAsync();
                 HandleCommand(line);
@@ -254,6 +282,11 @@ namespace BallSimulationUWP
 
         public void HandleCommand(string msg)
         {
+            if (msg.Length == 0)
+            {
+                return;
+            }
+
             var parts = msg.Split(' ');
             var cmd = parts[0];
 
@@ -309,7 +342,15 @@ namespace BallSimulationUWP
 
         public void Close()
         {
-            _client.Dispose();
+            try
+            {
+                _shouldHandle = false;
+                _client.Client.Dispose();
+            }
+            catch
+            {
+                // ignored
+            }
         }
 
         public void SendCommand(string cmd)
@@ -318,7 +359,15 @@ namespace BallSimulationUWP
             {
                 cmd += "\n";
             }
-            _writer.Write(cmd.ToCharArray());
+
+            try
+            {
+                _writer.Write(cmd.ToCharArray());
+            }
+            catch
+            {
+                Close();
+            }
         }
     }
 }

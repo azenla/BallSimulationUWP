@@ -1,18 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.NetworkInformation;
 using System.Numerics;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
+using Windows.Foundation;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
 
 namespace BallSimulationUWP
 {
-    sealed partial class App : Application
+    sealed partial class App
     {
         private WorldServer _server;
         private Simulator _simulator;
@@ -23,7 +20,7 @@ namespace BallSimulationUWP
             this.Suspending += OnSuspending;
         }
 
-        protected override void OnLaunched(LaunchActivatedEventArgs e)
+        private void StartServer()
         {
             _simulator = new Simulator(new World());
             _server = new WorldServer(_simulator, 9020);
@@ -32,12 +29,17 @@ namespace BallSimulationUWP
 
             for (var i = 1; i <= 10; i++)
             {
-                var factor = (float) random.NextDouble() * 2;
+                var factor = (float)random.NextDouble() * 2;
                 var ball = new BallEntity(factor, 20.0f, new Vector2(i * 50, i * 50));
                 _simulator.AddBall(ball);
             }
 
             _server.Start();
+        }
+
+        protected override void OnLaunched(LaunchActivatedEventArgs e)
+        {
+            StartServer();
 
             var rootFrame = Window.Current.Content as Frame;
 

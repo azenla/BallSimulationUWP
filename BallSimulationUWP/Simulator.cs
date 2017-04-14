@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using Windows.UI.Xaml;
 
@@ -43,10 +44,19 @@ namespace BallSimulationUWP
 
         public int TickCounter { get; private set; }
 
+        public const double DefaultWidth = 2048.0;
+        public const double DefaultHeight = 2048.0;
+
         public IList<BallEntity> Entities = new List<BallEntity>();
 
-        public double WorldWidth = 1024;
-        public double WorldHeight = 1024;
+        public readonly double WorldWidth;
+        public readonly double WorldHeight;
+
+        public World(double width = DefaultWidth, double height = DefaultHeight)
+        {
+            WorldWidth = width;
+            WorldHeight = height;
+        }
 
         public void Scatter()
         {
@@ -159,10 +169,11 @@ namespace BallSimulationUWP
             }
 
             Vector2 minimumTranslationDistance;
+            var isOnTopOfEachOther = Math.Abs(distance) <= World.Epsilon;
 
-            if (Math.Abs(distance) > World.Epsilon)
+            if (!isOnTopOfEachOther)
             {
-                minimumTranslationDistance = delta * (Radius + entity.Radius - distance) / distance;
+                minimumTranslationDistance = delta * ((Radius + entity.Radius - distance) / distance);
             }
             else
             {
@@ -176,25 +187,33 @@ namespace BallSimulationUWP
             var inverseMassTotal = inverseMassA + inverseMassB;
 
             var targetPositionA = Position + minimumTranslationDistance * (inverseMassA / inverseMassTotal);
-            var targetPositionB = entity.Position + minimumTranslationDistance * (inverseMassB / inverseMassTotal);
+            var targetPositionB = entity.Position - minimumTranslationDistance * (inverseMassB / inverseMassTotal);
 
             var impactSpeed = Velocity - entity.Velocity;
             var velocityNumber = VectorUtilities.DotProduct(impactSpeed,
                 VectorUtilities.Normalize(minimumTranslationDistance));
 
+            Position = targetPositionA;
+            entity.Position = targetPositionB;
+
             if (velocityNumber > World.Epsilon)
             {
+                Updated = entity.Updated = true;
                 return;
             }
 
-            var impulse = minimumTranslationDistance *
-                          (-(1.0f + World.Restitution) * velocityNumber / inverseMassTotal);
+            var impulseFactor = -(1.0f * World.Restitution) * velocityNumber / inverseMassTotal;
+            var impulse = Vector2.Normalize(minimumTranslationDistance) * impulseFactor;
 
-            var targetVelocityA = Velocity + impulse * inverseMassA;
-            var targetVelocityB = entity.Velocity - impulse * inverseMassB;
+            if (float.IsNaN(impulse.Length()))
+            {
+                impulse = new Vector2(0.0f, 0.0f);
+            }
 
-            Position = targetPositionA;
-            entity.Position = targetPositionB;
+            var deltaVelocityA = impulse * inverseMassA;
+            var deltaVelocityB = -(impulse * inverseMassB);
+            var targetVelocityA = Velocity + deltaVelocityA;
+            var targetVelocityB = entity.Velocity + deltaVelocityB;
 
             Velocity = targetVelocityA;
             entity.Velocity = targetVelocityB;
@@ -239,7 +258,7 @@ namespace BallSimulationUWP
 
         public void DetectWorldBoundCollision(World world)
         {
-            var r2 = Radius * 2 + 2;
+            var r2 = Radius * 2;
             if (Position.X - r2 < World.Epsilon)
             {
                 Position.X = r2;
@@ -274,7 +293,7 @@ namespace BallSimulationUWP
 
     public class Simulator
     {
-        public static int TickRate = 60;
+        public static int TickRate = 200;
 
         public readonly World World;
         public Action OnTickCallback;
