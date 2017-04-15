@@ -1,0 +1,16 @@
+version: 1.0.{build}
+pull_requests:
+  do_not_increment_build_number: true
+os: Visual Studio 2017
+configuration: Release
+platform:
+- x86
+- x64
+- ARM
+before_build:
+- cmd: nuget restore
+build:
+  project: BallSimulation.sln
+  parallel: true
+  verbosity: minimal
+deploy: off
