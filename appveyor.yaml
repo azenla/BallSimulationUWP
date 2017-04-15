@@ -10,7 +10,7 @@ platform:
 before_build:
 - cmd: nuget restore
 build:
-  project: BallSimulation.sln
+  project: BallSimulationUWP.sln
   parallel: true
   verbosity: minimal
 deploy: off
