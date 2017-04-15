@@ -14,8 +14,8 @@ namespace BallSimulationUWP
     {
         private readonly Simulator _simulator;
         private readonly TcpListener _listener;
-        private readonly List<WorldServerClient> _clients = new List<WorldServerClient>();
 
+        private readonly List<WorldServerClient> _clients = new List<WorldServerClient>();
         private readonly Queue<WorldServerClient> _newClients = new Queue<WorldServerClient>();
 
         private bool _running;
@@ -94,7 +94,7 @@ namespace BallSimulationUWP
             }
             else if (cmd == "S")
             {
-                _simulator.World.Scatter();    
+                _simulator.World.Scatter();
             }
             else if (cmd == "T")
             {
