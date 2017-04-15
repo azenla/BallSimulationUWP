@@ -4,7 +4,7 @@
   <mp:PhoneIdentity PhoneProductId="2b8f251e-d7ae-48ef-9e56-a0a5362a280b" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
   <Properties>
     <DisplayName>BallSimulationUWP</DisplayName>
-    <PublisherDisplayName>kaend</PublisherDisplayName>
+    <PublisherDisplayName>Kenneth Endfinger</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Dependencies>
