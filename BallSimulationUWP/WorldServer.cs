@@ -106,15 +106,11 @@ namespace BallSimulationUWP
             }
             else if (cmd == "G")
             {
-                World.Gravity = Math.Abs(World.Gravity) > World.Epsilon ? 0.0f : World.DefaultGravity;
+                World.Gravity = Math.Abs(World.Gravity) > World.Epsilon ? 0.0f : World.RealWorldGravity;
             }
             else if (cmd == "C")
             {
                 World.EnableCollisions = !World.EnableCollisions;
-            }
-            else if (cmd == "E")
-            {
-                World.Restitution = Math.Abs(World.Restitution) < World.Epsilon ? 0.85f : 0.0f;
             }
             else if (cmd == "D")
             {

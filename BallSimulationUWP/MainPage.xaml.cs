@@ -16,6 +16,8 @@ namespace BallSimulationUWP
 {
     public sealed partial class MainPage
     {
+        public const double AspectRatio = 4 / 3;
+
         private WorldClient _client;
         private readonly Dictionary<BallEntity, Ellipse> _entityShapes;
 
@@ -31,18 +33,30 @@ namespace BallSimulationUWP
             {
                 var point = args.GetCurrentPoint(MainCanvas);
                 var position = ScaleClientToServerPosition(point.Position.ToVector2());
-                AddBallAtPosition(position.X, position.Y);
+                try
+                {
+                    var mass = float.Parse(MassInputBox.Text);
+                    AddBallAtPosition(mass, position.X, position.Y);
+                }
+                catch
+                {
+                    // ignored
+                }
             };
 
             SizeChanged += (sender, args) =>
             {
+                if (Math.Abs(args.NewSize.Height - args.PreviousSize.Height) > 0.1)
+                {
+                    Width = args.NewSize.Height / AspectRatio;
+                }
+
                 RefreshAllEntities();
             };
         }
 
-        public void AddBallAtPosition(float x, float y)
+        public void AddBallAtPosition(float mass, float x, float y)
         {
-            var mass = new Random().NextDouble();
             _client.SendCommand($"A {mass} 20.0 {x} {y} 20.0 20.0");
         }
 
@@ -144,7 +158,10 @@ namespace BallSimulationUWP
 
         public Vector2 ScaleServerToClientPosition(Vector2 position)
         {
-            var scaleX = MainCanvas.ActualWidth / World.DefaultWidth; // TODO: Have server and client negotiate at connection start, to get world information
+            var scaleX =
+                MainCanvas.ActualWidth /
+                World
+                    .DefaultWidth; // TODO: Have server and client negotiate at connection start, to get world information
             var scaleY = MainCanvas.ActualHeight / World.DefaultHeight;
 
             return new Vector2((float) (position.X * scaleX), (float) (position.Y * scaleY));
@@ -152,7 +169,10 @@ namespace BallSimulationUWP
 
         public Vector2 ScaleClientToServerPosition(Vector2 position)
         {
-            var scaleX = World.DefaultWidth / MainCanvas.ActualWidth; // TODO: Have server and client negotiate at connection start, to get world information
+            var scaleX =
+                World.DefaultWidth /
+                MainCanvas
+                    .ActualWidth; // TODO: Have server and client negotiate at connection start, to get world information
             var scaleY = World.DefaultHeight / MainCanvas.ActualHeight;
 
             return new Vector2((float) (position.X * scaleX), (float) (position.Y * scaleY));
@@ -183,11 +203,6 @@ namespace BallSimulationUWP
             _client.SendCommand("C");
         }
 
-        private void ToggleElasticity_OnClick(object sender, RoutedEventArgs e)
-        {
-            _client.SendCommand("E");
-        }
-
         private void ClearEntities()
         {
             foreach (var shape in _entityShapes.Values)
@@ -212,7 +227,7 @@ namespace BallSimulationUWP
             if (addresses.Length == 0)
             {
                 Debug.WriteLine($"Failed to resolve host {ip}... falling back to local server.");
-                addresses = new[] { IPAddress.Loopback };
+                addresses = new[] {IPAddress.Loopback};
             }
             var address = addresses[0];
             Debug.WriteLine($"Connecting to {address}");
@@ -238,6 +253,18 @@ namespace BallSimulationUWP
 
             var result = await dialog.ShowAsync();
             return result == ContentDialogResult.Primary ? box.Text : "";
+        }
+
+        private void MassInputBox_OnTextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                var f = float.Parse(MassInputBox.Text);
+            }
+            catch
+            {
+                MassInputBox.Text = "1.0";
+            }
         }
     }
 }

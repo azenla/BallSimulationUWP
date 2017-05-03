@@ -36,7 +36,7 @@
             <Button Grid.Column="4" Name="ToggleGravityButton" Click="ToggleGravityButton_Click" Content="Toggle Gravity"></Button>
             <Button Grid.Column="6" Name="ZeroVelocityButton" Click="ZeroVelocityButton_OnClick" Content="Zero Velocity"></Button>
             <Button Grid.Column="8" Name="ToggleCollisions" Click="ToggleCollisions_OnClick" Content="Toggle Collisions"></Button>
-            <Button Grid.Column="10" Name="ToggleElasticity" Click="ToggleElasticity_OnClick" Content="Toggle Elasticity"></Button>
+            <TextBox Grid.Column="10" Name="MassInputBox" Text="1.0" InputScope="Number" AcceptsReturn="False" TextChanged="MassInputBox_OnTextChanged"></TextBox>
             <Button Grid.Column="12" Name="ClientConnect" Click="ClientConnect_OnClick" Content="Change Server"></Button>
         </Grid>
 

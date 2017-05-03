@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Numerics;
 using Windows.UI.Xaml;
 
@@ -37,7 +36,6 @@ namespace BallSimulationUWP
         public static float RealWorldScale = 10.0f;
         public static float DefaultGravity = RealWorldScale * RealWorldGravity;
 
-        public static float Restitution = 0.85f;
         public static float Gravity = DefaultGravity;
         public static float Epsilon = 0.000009f;
         public static bool EnableCollisions = true;
@@ -202,7 +200,7 @@ namespace BallSimulationUWP
                 return;
             }
 
-            var impulseFactor = -(1.0f * World.Restitution) * velocityNumber / inverseMassTotal;
+            var impulseFactor = -1.0f * velocityNumber / inverseMassTotal;
             var impulse = Vector2.Normalize(minimumTranslationDistance) * impulseFactor;
 
             if (float.IsNaN(impulse.Length()))
@@ -262,30 +260,26 @@ namespace BallSimulationUWP
             if (Position.X - r2 < World.Epsilon)
             {
                 Position.X = r2;
-                Velocity.X = -(Velocity.X * World.Restitution);
-                Velocity.Y = Velocity.Y * World.Restitution;
+                Velocity.X = -Velocity.X;
                 Updated = true;
             }
             else if (Position.X + r2 > world.WorldWidth)
             {
                 Position.X = (float) world.WorldWidth - r2;
-                Velocity.X = -(Velocity.X * World.Restitution);
-                Velocity.Y = Velocity.Y * World.Restitution;
+                Velocity.X = -Velocity.X;
                 Updated = true;
             }
 
             if (Position.Y - r2 < World.Epsilon)
             {
                 Position.Y = r2;
-                Velocity.Y = -(Velocity.Y * World.Restitution);
-                Velocity.X = Velocity.X * World.Restitution;
+                Velocity.Y = -Velocity.Y;
                 Updated = true;
             }
             else if (Position.Y + r2 > world.WorldHeight)
             {
                 Position.Y = (float) world.WorldHeight - r2;
-                Velocity.Y = -(Velocity.Y * World.Restitution);
-                Velocity.X = Velocity.X * World.Restitution;
+                Velocity.Y = -Velocity.Y;
                 Updated = true;
             }
         }
@@ -293,7 +287,7 @@ namespace BallSimulationUWP
 
     public class Simulator
     {
-        public static int TickRate = 200;
+        public static int TickRate = 120;
 
         public readonly World World;
         public Action OnTickCallback;
